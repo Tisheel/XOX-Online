@@ -1,47 +1,50 @@
 import { MyWebSocket } from "./interfaces.js";
 
-const Rooms = new Map<number, MyWebSocket[]>()
+class RoomManager {
 
-export default class RoomManager {
+    Rooms = new Map<number, MyWebSocket[]>()
 
     constructor() { }
 
     getRoom = (roomId: number) => {
-        return Rooms.get(roomId) ?? []
+        return this.Rooms.get(roomId) ?? null
     }
 
-    createRoom = (socket: MyWebSocket) => {
-        const roomId: number = Math.floor(100000 + Math.random() * 900000)
-        Rooms.set(roomId, [])
-        socket.send(`Room ID: ${roomId}`)
-        this.joinRoom(roomId, socket)
+    addRoom = (roomId: number) => {
+        this.Rooms.set(roomId, [])
+    }
+
+    getRoomSize = (roomId: number) => {
+        const room = this.getRoom(roomId)
+        if (room) {
+            return room.length
+        }
+        return 0
     }
 
     joinRoom = (roomId: number, socket: MyWebSocket) => {
-        const room = Rooms.get(roomId)
+        let room = this.getRoom(roomId)
         if (!room) {
-            socket.send(`Room ID ${roomId} not found`)
-            return
-        }
-        if (room.length === 2) {
-            socket.send(`Room limit exceeded`)
-            return
+            this.addRoom(roomId)
+            room = this.getRoom(roomId)
         }
         room?.push(socket)
         socket.roomId = roomId
-        this.broadcast(roomId, `Socket ${socket.id} joined`)
     }
 
     broadcast = (roomId: number, data: string) => {
-        const room = Rooms.get(roomId)
+        const room = this.Rooms.get(roomId)
         room?.forEach((socket: MyWebSocket) => {
             socket.send(data)
         })
     }
 
     deleteRoom = (roomId: number) => {
-        this.broadcast(roomId, 'Room deleted')
-        Rooms.delete(roomId)
+        this.Rooms.delete(roomId)
     }
 
 }
+
+const room = new RoomManager()
+
+export default room

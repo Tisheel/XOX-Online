@@ -1,78 +1,18 @@
-import RoomManager from "./RoomManager.js"
-import { Game, Move } from "./interfaces.js"
+import room from "./RoomManager.js"
+import { Move, MyWebSocket } from "./interfaces.js"
 
 const Games = new Map<number, Game>()
 
-const room = new RoomManager()
-
-export default class GameManager {
+export class GameManager {
 
     constructor() { }
 
-    startGame = (roomId: number) => {
-        const players = room.getRoom(roomId)
-        const game: Game = {
-            turn: 1,
-            board: [0, 0, 0, 0, 0, 0, 0, 0, 0],
-            players
-        }
+    getGame = (roomId: number) => {
+        return Games.get(roomId) ?? null
+    }
+
+    addGame = (roomId: number, game: Game) => {
         Games.set(roomId, game)
-        this.boradcastTurn(roomId)
-        this.boradcastBoard(roomId)
-    }
-
-    getTurn = (roomId: number) => {
-        return Games.get(roomId)?.turn ?? -1
-    }
-
-    setTurn = (roomId: number, turn: number) => {
-        const game = Games.get(roomId)
-        if (game)
-            game.turn = turn
-    }
-
-    getBoard = (roomId: number) => {
-        return Games.get(roomId)?.board ?? []
-    }
-
-    getPlayers = (roomId: number) => {
-        return Games.get(roomId)?.players ?? []
-    }
-
-    boradcastTurn = (roomId: number) => {
-
-        room.broadcast(roomId, JSON.stringify({
-            type: 'TURN',
-            data: this.getPlayers(roomId)[this.getTurn(roomId) - 1].id
-        }))
-
-    }
-
-    boradcastBoard = (roomId: number) => {
-
-        room.broadcast(roomId, JSON.stringify({
-            type: 'BOARD',
-            data: this.getBoard(roomId)
-        }))
-
-    }
-
-    move = (roomId: number, move: Move) => {
-        if (this.getPlayers(roomId)[this.getTurn(roomId) - 1].id !== move.player.id) {
-            move.player.send('Not your turn')
-            return
-        }
-        this.getBoard(roomId)[move.position] = this.getTurn(roomId)
-        const winner: number = checkWinner(this.getBoard(roomId))
-        if (winner) {
-            room.broadcast(roomId, JSON.stringify({
-                type: 'WINNER',
-                data: this.getPlayers(roomId)[winner - 1]
-            }))
-        }
-        this.getTurn(roomId) === 1 ? this.setTurn(roomId, 2) : this.setTurn(roomId, 1)
-        this.boradcastTurn(roomId)
-        this.boradcastBoard(roomId)
     }
 
     deleteGame = (roomId: number) => {
@@ -81,21 +21,77 @@ export default class GameManager {
 
 }
 
-function checkWinner(board: number[]) {
-    // Define winning combinations (indices)
-    const winningCombos = [
-        [0, 1, 2], [3, 4, 5], [6, 7, 8], // Rows
-        [0, 3, 6], [1, 4, 7], [2, 5, 8], // Columns
-        [0, 4, 8], [2, 4, 6] // Diagonals
-    ]
+export class Game extends GameManager {
+    roomId: number
+    players: MyWebSocket[]
+    turn: number
+    board: number[]
+    constructor(roomId: number) {
+        super()
+        this.roomId = roomId
+        this.players = room.getRoom(roomId) ?? []
+        this.turn = 1
+        this.board = [0, 0, 0, 0, 0, 0, 0, 0, 0]
+        this.addGame(roomId, this)
+        room.broadcast(roomId, JSON.stringify({
+            type: 'GAME_STATE',
+            data: {
+                players: this.players.map(x => x.name),
+                turn: this.turn,
+                board: this.board
+            }
+        }))
+    }
 
-    // Check each winning combination
-    for (const combo of winningCombos) {
-        const [a, b, c] = combo
-        if (board[a] !== 0 && board[a] === board[b] && board[a] === board[c]) {
-            return board[a] // Return the winning player
+    move = (roomId: number, move: Move) => {
+        if (this.players[this.turn - 1].id !== move.player.id) {
+            move.player.send(JSON.stringify({
+                type: 'ILLEGAL_MOVE',
+                data: 0
+            }))
+            return
+        }
+        this.board[move.position] = this.turn
+        this.turn === 1 ? this.turn = 2 : this.turn = 1
+        room.broadcast(roomId, JSON.stringify({
+            type: 'GAME_STATE',
+            data: {
+                players: this.players.map(x => x.name),
+                turn: this.turn,
+                board: this.board
+            }
+        }))
+        const winner: number = checkWinner(this.board)
+        if (winner) {
+            room.broadcast(roomId, JSON.stringify({
+                type: 'WINNER',
+                data: this.players[winner - 1].name
+            }))
+            return
+        }
+    }
+}
+
+function checkWinner(board: number[]) {
+    // Check rows
+    for (let i = 0; i < 9; i += 3) {
+        if (board[i] === board[i + 1] && board[i] === board[i + 2] && board[i] !== 0) {
+            return board[i];
         }
     }
 
-    return 0 // If no winner
+    // Check columns
+    for (let i = 0; i < 3; i++) {
+        if (board[i] === board[i + 3] && board[i] === board[i + 6] && board[i] !== 0) {
+            return board[i];
+        }
+    }
+
+    // Check diagonals
+    if ((board[0] === board[4] && board[0] === board[8] && board[0] !== 0) ||
+        (board[2] === board[4] && board[2] === board[6] && board[2] !== 0)) {
+        return board[4];
+    }
+
+    return 0; // No winner yet
 }

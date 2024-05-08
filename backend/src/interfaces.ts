@@ -1,19 +1,16 @@
 import WebSocket from "ws"
+import { Game } from "./GameManager.js"
 
 export interface MyWebSocket extends WebSocket {
     id: string,
-    roomId: number
+    name: string,
+    roomId: number,
+    game: Game
 }
 
 export interface WsRequest {
     type: string,
     data?: any
-}
-
-export interface Game {
-    turn: number
-    board: number[]
-    players: MyWebSocket[]
 }
 
 export interface Move {
