@@ -15,7 +15,7 @@ const Game = () => {
     const query = new URLSearchParams(useLocation().search)
 
     useEffect(() => {
-        const ws = new WebSocket('ws://127.0.0.1:6969')
+        const ws = new WebSocket(process.env.REACT_APP_HOST)
         setWs(ws)
         ws.onopen = (e) => {
             ws.send(JSON.stringify({
