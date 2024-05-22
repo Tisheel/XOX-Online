@@ -4,7 +4,7 @@ import { MyWebSocket, WsRequest } from './interfaces.js'
 import { Game, GameManager } from './GameManager.js'
 import room from './RoomManager.js'
 
-const wss: WebSocketServer = new WebSocketServer({ port: 6969 })
+const wss: WebSocketServer = new WebSocketServer({ port: Number(process.env.PORT) || 6969 })
 
 const games = new GameManager()
 
